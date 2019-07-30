@@ -1,0 +1,115 @@
+<canvas id="ctx" width="800" height="800" style="border:1px solid #000000;"></canvas>
+<script src="/socket.io/socket.io.js"></script>
+<script>
+    //VARS
+    var boardState;
+    var socket = io();
+    var canvas = document.getElementById("ctx");
+    var ctx = canvas.getContext("2d");
+    var mousePos;
+    var boardState;
+    var mouseDown = false;
+    var canDraw = false;
+    getBoardState();
+    //EVENT LISTENERS
+    document.getElementById("ctx").addEventListener("mousedown", onMouseDown);
+    document.getElementById("ctx").addEventListener("mouseup", onMouseUp);
+    document.addEventListener('mousemove', onMouseMovement);
+
+    //SOCKET ON
+    socket.on('sendBoardState',function(board){
+        boardState = board;
+    });
+    socket.on('updateBoard', function(board){
+        boardState = board;
+        drawBoard();
+    });
+    socket.on("canDrag", function(board){
+        getBoardState();
+        canDraw = true;
+    });
+
+    //UTILITY
+    function getBoardState(){
+        socket.emit("askBoardState");
+    }
+    function convertMousePosToBoard(){
+        return {
+            x:parseInt(mousePos.x/100),
+            y:parseInt(mousePos.y/100)
+        };
+    } 
+
+    //EVENTS
+    function onMouseDown(evt){
+        
+        mouseDown = true;
+        var boardPos = convertMousePosToBoard();
+        console.log(boardPos.x + " " + boardPos.y);
+        socket.emit("checkPiece",boardPos);
+
+    }
+    function onMouseMovement(evt) {
+        var rect = canvas.getBoundingClientRect();
+
+        mousePos = {
+            x: evt.clientX - rect.left,
+            y: evt.clientY - rect.top
+        };
+        if(mouseDown == true && canDraw == true){
+            getBoardState();
+            
+            requestAnimationFrame(function(){
+                drawImg(mousePos.x,mousePos.y)
+            });
+        }
+    }
+    function onMouseUp(evt){
+        if(canDraw){
+        socket.emit("setPiece", convertMousePosToBoard());
+        mouseDown = false;
+        canDraw = false;
+        clear();
+        getBoardState();
+        drawBoard();
+        }
+        
+    }
+
+    function clear(){
+        ctx.clearRect(0,0,800,800);
+    }
+    function drawBoard(){
+        var isDark = true;
+        requestAnimationFrame(function(){
+        for(var y = 0;y < 8;y++){
+
+            isDark = !isDark;
+            for(var x = 0;x < 8;x++){
+
+                if(isDark){
+                    ctx.fillStyle = 'black';
+                    ctx.fillRect(x*100,y*100,100,100);
+                }else{
+                    ctx.fillStyle = 'grey';
+                    ctx.fillRect(x*100,y*100,100,100);
+                }
+                if(boardState.arr[y][x] == 1){
+                        drawImg(x*100+25,y*100+25);
+                }
+                isDark = !isDark;
+            }
+        }
+        
+    });
+}
+    
+    function drawImg(x,y){
+        img = new Image();
+        img.src = "/client/img/white_pawn.png";
+        img.onload= function(){
+            ctx.drawImage(img,x,y);
+        }
+    }
+
+</script>
